@@ -25,7 +25,7 @@ The **Truck Robot Command Processor** is a backend service that simulates the mo
 
 ---
 
-## 2. Coordinate System & Mathematics
+## 2. Coordinate System
 The tabletop is modeled as a Cartesian plane where the South West corner is the origin.
 
 - **Dimensions**: Defult dimensions are $5 \times 5$ units. these can be changed in $application.yaml$
