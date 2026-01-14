@@ -1,0 +1,153 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.9'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.1.0'
+    id 'jacoco'
+    id 'checkstyle'
+    id 'pmd'
+}
+
+group = 'au.chipomho'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = '17'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Config for Checkstyle
+checkstyle {
+    toolVersion = '10.12.5'
+    configFile = file("${project.rootDir}/config/checkstyle/checkstyle.xml")
+    ignoreFailures = false
+    showViolations = true
+}
+
+// Config for PMD
+pmd {
+    consoleOutput = true
+    toolVersion = "7.0.0"
+    // Use standard rulesets
+    ruleSets = [
+            "category/java/errorprone.xml",
+            "category/java/bestpractices.xml",
+            "category/java/codestyle.xml"
+    ]
+}
+
+// Excluding generated OpenAPI code from checks
+checkstyleMain.exclude '**/au/chipomho/robot/model/**'
+checkstyleMain.exclude '**/au/chipomho/robot/api/**'
+pmdMain.exclude '**/au/chipomho/robot/model/**'
+pmdMain.exclude '**/au/chipomho/robot/api/**'
+
+def buildDirectory = layout.buildDirectory.get().asFile
+def coverageExclusions = ext.has('coverageExclusions') ? ext.get("coverageExclusions").split("," as Closure) : []
+
+dependencies {
+
+    annotationProcessor libs.lombok
+    compileOnly libs.lombok
+
+    implementation libs.bundles.aspect
+    implementation libs.commons.collections4
+    implementation libs.commons.lang3
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.15'
+
+    implementation libs.io.swagger.annotations
+    implementation libs.org.openapitools.jackson.databind
+
+    runtimeOnly libs.micrometer.core
+    runtimeOnly libs.micrometer.tracing.bridge.otel
+    runtimeOnly libs.opentelemetry.exporter.otlp
+    runtimeOnly libs.micrometer.context.propagation
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+// OpenAPI Generator Task
+openApiGenerate {
+    generatorName = "spring"
+    inputSpec = "$projectDir/src/main/resources/static/openapi.yaml".toString()
+    outputDir = "$buildDirectory/generated-sources".toString()
+    apiPackage = "au.chipomho.robot.api"
+    modelPackage = "au.chipomho.robot.model"
+    configOptions = [
+            interfaceOnly: "true",
+            useSpringBoot3: "true",
+            useTags: "true",
+            useJakartaEe: "true"
+    ]
+}
+
+// Ensure code is generated before compilation
+sourceSets.main.java.srcDir "$buildDirectory/generated-sources/src/main/java"
+compileJava.dependsOn tasks.openApiGenerate
+
+jacocoTestReport {
+    dependsOn test // tests are required to run before generating the report
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: coverageExclusions)
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            failOnViolation = !project.hasProperty('cobertura.continueonfailure')
+            element = 'PACKAGE'
+            excludes = ext.has('coverageExclusions') ? ext.get("coverageExclusions").split("," as Closure) : []
+            limit {
+                counter = 'COMPLEXITY'
+                value = 'COVEREDRATIO'
+                minimum = 0.7
+            }
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.7
+            }
+            limit {
+                counter = 'CLASS'
+                value = 'COVEREDRATIO'
+                minimum = 0.8
+            }
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    minHeapSize = "1024m" // initial heap size
+    maxHeapSize = "2048m" // maximum heap size
+    jvmArgs '-XX:MaxMetaspaceSize=2048m' // mem argument for the test JVM
+
+    jacoco {
+        enabled = true
+        destinationFile = layout.buildDirectory.file("jacoco/${name}.exec").get().asFile
+        includes = []
+        excludes = []
+        excludeClassLoaders = []
+        includeNoLocationClasses = false
+        dumpOnExit = true
+        classDumpDir = null
+        output = JacocoTaskExtension.Output.FILE
+        jmx = false
+    }
+
+}
+
+

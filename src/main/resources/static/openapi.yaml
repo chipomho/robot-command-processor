@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: Robot Command Processor API
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      tags:
+        - RobotCommandProcessor
+      summary: Health check endpoint, useful if running in a container
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseModel'
+  /execute:
+    post:
+      tags:
+        - RobotCommandProcessor
+      summary: Execute movement commands
+      operationId: executeRobotCommands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '200':
+          description: Successful execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionModel'
+
+components:
+  schemas:
+    DirectionType:
+      type: string
+      enum: [NORTH, SOUTH, EAST, WEST]
+
+    CommandType:
+      type: string
+      enum: [MOVE, LEFT, RIGHT]
+
+    PositionModel:
+      type: object
+      required: [x, y, direction]
+      properties:
+        x: { type: integer, example: 0 }
+        y: { type: integer, example: 5 }
+        direction: { $ref: '#/components/schemas/DirectionType' }
+
+    CommandRequest:
+      type: object
+      #making the request body properties optional
+      #required: [origin, commands]
+      properties:
+        origin: { $ref: '#/components/schemas/PositionModel' }
+        commands:
+          type: array
+          items: { $ref: '#/components/schemas/CommandType' }
+        position: { type: boolean, example: true }
+
+    ReleaseModel:
+      type: object
+      properties:
+        version: { type: string, example: "1.0.0" }
+        commitHash: { type: string, example: "a1b2c3d" }
+        releaseDate: { type: string, example: "2023-10-27" }
